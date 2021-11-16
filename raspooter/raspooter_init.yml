@@ -1,0 +1,104 @@
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: pi
+
+  tasks:
+    - name: make me current
+      become: true
+      apt:
+        update_cache: yes
+        upgrade: 'yes'
+ 
+    - name: install python3
+      become: true
+      apt:
+        update_cache: yes
+        name: 
+          - python
+        state: present
+    
+    - name: setup static IP-Adress for raspooter
+      become: true
+      copy:
+        dest: "/etc/systemd/network/10-eth0.netdev"
+        content: |
+          [Match]
+          Name=eth0
+          [Network]
+          DHCP=no
+
+    - name: setup static IP-Adress for raspooter
+      become: true
+      copy:
+        dest: "/etc/systemd/network/11-eth0.network"
+        content: |
+          [Match]
+          Name=eth0
+          [Network]
+          Address=192.168.178.200/24
+          DNS=192.168.178.1
+          [Route]
+          Gateway=192.168.178.1
+
+    - name: install the required dependencies
+      become: true
+      apt:
+        name: 
+          - tcpdump
+          - dnsmasq
+          - nfs-kernel-server
+        state: present
+        update_cache: yes
+
+    - name: configure working DNS in resolved.conf
+      become: yes
+      replace: 
+        path: /etc/systemd/resolved.conf
+        regexp: '(^#DNS=\s)(.*)$'
+        replace: '\1DNS=192.168.178.1'
+        backup: yes
+
+    - name: create directory tftpboot
+      become: yes
+      file:
+        path: /tftpboot
+        state: directory
+        mode: "u=rwx,g=rwx,o=rwx"
+
+    - name: configure dnsmasq
+      become: true
+      copy:
+        dest: "/etc/dnsmasq.conf"
+        content: |
+          port=0
+          dhcp-range=192.168.178.255,proxy
+          log-dhcp
+          enable-tftp
+          tftp-root=/tftpboot
+          pxe-service=0,"Raspberry Pi Boot"
+          log-queries
+          log-facility=/var/log/dnsmasq.log
+    
+    - name: nfs share exports
+      become: true
+      copy:
+        dest: "/etc/exports"
+        content: |
+          /tftpboot *(rw,sync,no_subtree_check,no_root_squash)"
+    
+    - name: Restarting Network
+      become: yes 
+      service:
+        name: networking
+        state: restarted
+
+    - name: Restart service dnsmasq
+      become: yes
+      ansible.builtin.service:
+        name: dnsmasq
+        state: restarted
+
+    - name: Unconditionally reboot the machine with all defaults
+      become: true
+      reboot:
+

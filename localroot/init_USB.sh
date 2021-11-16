@@ -1,5 +1,5 @@
 TGT_DEVICE=$(lsblk -S | sed -n '3,3p' | sed 's/ .*//')
-TGT_SIZE=$(lsblk -b | sed -n '5,5p' | awk '{printf "+%.fG\n", ($4/2)/1024/1024/1024 - 1}')
+TGT_SIZE=$(lsblk -b | grep "^$TGT_DEVICE" | awk '{printf "+%.fG\n", ($4/2)/1024/1024/1024 - 1}')
 echo $TGT_DEVICE
 echo $TGT_SIZE
 
