@@ -17,15 +17,11 @@ fi
 START_BOOT=$(sfdisk -l ubuntu-20.04.2-preinstalled-server-arm64+raspi.img -o Start | sed '0,/^ Start$/d' | sed -n '1p')
 START_ROOT=$(sfdisk -l ubuntu-20.04.2-preinstalled-server-arm64+raspi.img -o Start | sed '0,/^ Start$/d' | sed -n '2p')
 
-echo $START_BOOT
-echo $START_ROOT
+BOOT_SIZE_LIMIT=$(fdisk --bytes -lo Size ubuntu-20.04.2-preinstalled-server-arm64+raspi.img | sed -n '9p')
+ROOT_SIZE_LIMIT=$(fdisk --bytes -lo Size ubuntu-20.04.2-preinstalled-server-arm64+raspi.img | sed -n '10p')
 
-START_BOOT_OFFSET=$(( 512 * START_BOOT ))
-START_ROOT_OFFSET=$(( 512 * START_ROOT ))
-
-echo $START_BOOT_OFFSET
-echo $START_ROOT_OFFSET
-
-sudo mount $IMAGE -o loop,offset=$START_BOOT_OFFSET localboot/boot_source/
-sudo mount $IMAGE -o loop,offset=$START_ROOT_OFFSET localroot/root_source/
+sudo mkdir -p localboot/boot_source
+sudo mkdir -p localroot/root_source
+sudo mount $IMAGE -o loop,offset=$(( 512 * $START_BOOT )),sizelimit=$(( 1 * $BOOT_SIZE_LIMIT )) localboot/boot_source/
+sudo mount $IMAGE -o loop,offset=$(( 512 * $START_ROOT )),sizelimit=$(( 1 * $ROOT_SIZE_LIMIT )) localroot/root_source/
 
