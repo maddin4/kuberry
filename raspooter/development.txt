@@ -2,7 +2,7 @@
 control ansible_connection=local
 
 [raspooterhost]
-raspi4-1 ansible_user=pi
+raspi4-3 ansible_user=pi
 
 [raspooterhost:vars]
 ansible_python_interpreter=/usr/bin/python3

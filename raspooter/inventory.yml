@@ -1,5 +1,5 @@
 all:
   raspooterhost:
-    raspi4-1
+    raspi4-3
     ansible_user=pi
-    staticip=192.168.178.211
+    staticip=192.168.178.213

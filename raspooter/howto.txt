@@ -1,0 +1,3 @@
+# run script
+ansible-playbook -i development.txt raspooter_init.yml 
+ansible-playbook -i development.txt raspooter_init_image.yml 
