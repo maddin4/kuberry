@@ -5,7 +5,6 @@
   vars:
     ubuntu_image: ubuntu-20.04.2-preinstalled-server-arm64+raspi.img
 
-
   tasks:
     - name: make me current
       become: true
@@ -105,8 +104,3 @@
     - name: Unconditionally reboot the machine with all defaults
       become: true
       reboot:
-
-    - name: download image of ubuntu
-      get_url:
-        url: https://cdimage.ubuntu.com/releases/20.04.2/release/{{ ubuntu_image }}.xz
-        dest: /tmp/{{ ubuntu_image }}.xz

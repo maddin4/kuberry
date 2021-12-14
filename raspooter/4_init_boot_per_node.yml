@@ -1,0 +1,106 @@
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: ubuntu
+  vars:
+    raspis:
+      - hostname: raspi4-1
+        serial: a6dd4fe7
+        ip: 192.168.178.211
+        mac: dc:a6:32:d6:d6:ac
+        storage_quirk: 090c:1000
+      - hostname: raspi4-2
+        serial: 267b735
+        ip: 192.168.178.212
+        mac: dc:a6:32:d6:d8:9b
+        storage_quirk: 090c:1000
+      - hostname: raspi4-3
+        serial: 8f1f3655
+        ip: 192.168.178.213
+        mac: dc:a6:32:cc:d5:62
+        storage_quirk: 090c:1000
+      - hostname: raspi4-4
+        serial: aa0c004d
+        ip: 192.168.178.214
+        mac: dc:a6:32:cc:e6:78
+        storage_quirk: 090c:1000
+      - hostname: raspi4-5
+        serial: 34f2d953
+        ip: 192.168.178.215
+        mac: dc:a6:32:cc:dd:54
+        storage_quirk: 090c:1000
+      - hostname: raspi4-6
+        serial: a51bfb08
+        ip: 192.168.178.216
+        mac: dc:a6:32:cc:e6:c9
+        storage_quirk: 090c:1000
+    raspis2:
+      - hostname: raspi4-7
+        serial:     
+        ip: 192.168.178.217
+        mac: dc:a6:32:26:16:92
+        storage_quirk: 152d:1561
+      - hostname: raspi4-8
+        serial: fb9653be
+        ip: 192.168.178.218
+        mac: dc:a6:32:26:0f:75
+        storage_quirk: 152d:1561
+      - hostname: raspi4-9
+        serial: ca54fad6
+        ip: 192.168.178.219
+        mac: dc:a6:32:26:16:9b      
+        storage_quirk: 152d:1561
+
+  tasks:
+#    - name: Print
+#      debug: 
+#        var: item.hostname
+#      loop: "{{ raspis }}"
+
+    - name: create boot directory
+      ansible.builtin.file:
+        path: /tftpboot/{{ item.serial }}
+        state: directory
+        mode: '0755'
+      become: true
+      loop: "{{ raspis }}"
+    
+    - name: copy boot directory
+      copy:
+        src: /kuberry/boot_source/    # note the '/' <-- !!!
+        dest: /tftpboot/{{ item.serial }}
+        remote_src: yes
+      become: true
+      loop: "{{ raspis }}"
+
+    - name: set cmdline.txt to be bootable
+      copy:
+        content: "usb-storage.quirks={{ item.storage_quirk }}:u dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=ROOT_KUBERRY rootfstype=ext4 elevator=deadline rootwait fixrtc cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1"
+        dest: /tftpboot/{{ item.serial }}/cmdline.txt
+      become: true
+      loop: "{{ raspis }}"
+          
+    - name: set config.txt
+      copy:
+        content: |
+          [pi4]
+          max_framebuffers=2
+          dtoverlay=vc4-fkms-v3d
+          boot_delay
+          kernel=vmlinux
+          initramfs initrd.img followkernel
+          arm_64bit=1
+        dest: /tftpboot/{{ item.serial }}/config.txt
+      become: true
+      loop: "{{ raspis }}"
+
+    - name: decompress kernel
+      shell: zcat -qf "/tftpboot/{{ item.serial }}/vmlinuz" > "/tftpboot/{{ item.serial }}/vmlinux"
+      become: true
+      loop: "{{ raspis }}"
+
+# not required for ubuntu
+#    - name: enable ssh access
+#      copy:
+#        content: ""
+#        dest: /tftpboot/{{ item.serial }}/ssh
+#      loop: "{{ raspis }}"

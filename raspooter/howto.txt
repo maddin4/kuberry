@@ -1,3 +1,9 @@
 # run script
-ansible-playbook -i development.txt raspooter_init.yml 
-ansible-playbook -i development.txt raspooter_init_image.yml 
+ansible-playbook -i development.txt 1_setup_raspooter.yml 
+ansible-playbook -i development.txt 2_prep_image_on_raspooter.yml 
+scp initusr.cfg pi@raspi4-3:/tmp/initusr.cfg
+scp 3_init_USB_device_per_node.sh pi@raspi4-3:/tmp/3_init_USB_device_per_node.sh
+--> remote login and execute
+
+TODO:
+do the stuff for boot

@@ -1,0 +1,116 @@
+
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: pi
+  vars:
+    ubuntu_image: ubuntu-20.04.1-preinstalled-server-arm64+raspi.img
+#    ubuntu_image: ubuntu-20.04.3-preinstalled-server-arm64+raspi.img
+#    ubuntu_image: ubuntu-21.10-preinstalled-server-arm64+raspi.img
+
+  tasks:
+    - name: Check that the ubuntu_image exists
+      stat:
+        path: /kuberry/{{ ubuntu_image }}
+        get_checksum: no
+        get_md5: no
+        get_mime: no
+        get_attributes: no      
+      register: IMAGE_EXISTS
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: IMAGE_EXISTS is {{ IMAGE_EXISTS }}
+
+    - name: download image of ubuntu
+      get_url:
+        url: http://old-releases.ubuntu.com/releases/focal/{{ ubuntu_image }}.xz
+        #url: https://cdimage.ubuntu.com/releases/20.04.3/release/{{ ubuntu_image }}.xz
+        #url: https://cdimage.ubuntu.com/releases/impish/release/{{ ubuntu_image }}.xz
+        dest: /kuberry/{{ ubuntu_image }}.xz
+#      when: IMAGE_EXISTS.failed == False
+
+    - name: unzip image of ubuntu
+      shell: xz -k --decompress {{ ubuntu_image }}.xz
+      args:
+        chdir: /kuberry
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: find boot image of ubuntu
+      shell: sfdisk -l ubuntu-20.04.2-preinstalled-server-arm64+raspi.img -o Start | sed '0,/^ Start$/d' | sed -n '1p'
+      register: START_BOOT
+      args:
+        chdir: /kuberry
+
+    - name: find boot image of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '1p'
+      register: START_BOOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find root image of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '2p'
+      register: START_ROOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find boot size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '9p'
+      register: BOOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find boot size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '10p'
+      register: ROOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+    
+    - name: Print
+      ansible.builtin.debug:
+        msg: BOOT_SIZE_LIMIT is {{ BOOT_SIZE_LIMIT }}
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: ROOT_SIZE_LIMIT is {{ ROOT_SIZE_LIMIT }}
+    
+    - name: create directory boot_source
+      ansible.builtin.file:
+        path: /kuberry/boot_source
+        state: directory
+        mode: '0755'
+
+    - name: create directory root_source
+      ansible.builtin.file:
+        path: /kuberry/root_source
+        state: directory
+        mode: '0755'
+
+#    - name: umount root_source
+#      shell: umount /kuberry/root_source/
+#      become: true
+#      args:
+#        executable: /bin/bash
+
+#    - name: umount boot_source
+#      shell: umount /kuberry/boot_source/
+#      become: true
+#      args:
+#        executable: /bin/bash
+
+    - name: mount boot_source image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_BOOT.stdout }} )),sizelimit=$(( 1 *  {{ BOOT_SIZE_LIMIT.stdout }} )) /kuberry/boot_source/
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: mount root_source image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_ROOT.stdout }} )),sizelimit=$(( 1 *  {{ ROOT_SIZE_LIMIT.stdout }} )) /kuberry/root_source/
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry

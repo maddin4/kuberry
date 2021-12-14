@@ -4,6 +4,11 @@ control ansible_connection=local
 [raspooterhost]
 raspi4-3 ansible_user=pi
 
+[worker]
+raspi4-1 serial=a6dd4fe7 hostname=raspi4-1
+
 [raspooterhost:vars]
 ansible_python_interpreter=/usr/bin/python3
 
+[worker:vars]
+ansible_python_interpreter=/usr/bin/python3
