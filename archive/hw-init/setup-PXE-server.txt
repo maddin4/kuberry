@@ -1,10 +1,14 @@
-holen des image:
+SQL auf dem raspooter als Ersartz für etcd
+https://pimylifeup.com/raspberry-pi-postgresql/
+
+
+#holen des image:
 wget https://cdimage.ubuntu.com/releases/20.04.2/release/ubuntu-20.04.2-preinstalled-server-arm64+raspi.img.xz
 ==============================
-entpacken:
+#entpacken:
 xz --decompress ubuntu-20.04.2-preinstalled-server-arm64+raspi.img.xz
 ==============================
-bestimmen der mountbaren Abbilder:
+#bestimmen der mountbaren Abbilder:
 fdisk -l ubuntu-20.04.2-preinstalled-server-arm64+raspi.img
 --> Sektorengröße (hier: 512 Bytes)
 --> Start img1: 2048
@@ -34,8 +38,8 @@ sudo mount /dev/sdc1 tgt_root_1
 sudo mount /dev/sdc2 tgt_root_2
 ==============================
 sync the image to mounted new boot:
-sudo rsync -qaHAXS root_source/ tgt_root_1
-sudo rsync -qaHAXS root_source/ tgt_root_2 &
+sudo rsync -qaHAXS root_source/ tgt_root_1 &
+sudo rsync -qaHAXS root_source/ tgt_root_2 
 
 ==============================
 setup partitions
@@ -62,9 +66,12 @@ LABEL=ROOT1         /other_root ext4 defaults 0 0
 LABEL=system-boot   /boot/firmware  vfat    defaults        0       1
 ==============================
 
+
+#BOOT!!!
+########
 edit cmdline.txt:
 #SABRENT-USB-SATA Adapter:
-usb-storage.quirks=152d:1561:u dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=ROOT2 rootfstype=ext4 elevator=deadline rootwait fixrtc
+usb-storage.quirks=152d:1561:u dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=ROOT1 rootfstype=ext4 elevator=deadline rootwait fixrtc 
 ==============================
 edit usercfg.txt:
 [pi4]

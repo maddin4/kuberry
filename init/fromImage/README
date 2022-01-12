@@ -1,0 +1,25 @@
+1. create mounts from image for boot and root
+1.a. Download image
+1.b. extract image
+1.c. mount boot from image
+1.d. mount root from image
+--> 1_init-ubuntu-image.yaml
+
+2. prepare /tftpboot
+2.a. copy boot from ubuntuboot to /tftpboot/<serial>
+2.b. change cmdline.txt in /tftpboot/<serial> to ??
+TOBE DONE for every node!
+--> 2_init-boot-from-ubuntu-image.yaml
+
+3. create partitions on USB-Drive
+3.a. wipe all partitions
+3.b. create n primary partitions
+3.c. create ext4 filesystem on partitions
+3.d. label partitions
+3.e. mount tgtroot (to store ubuntu root in 4)
+--> 3_init-us-drive.yaml
+TOBE DONE for every node!
+
+4. prepare root on USB
+--> 4_init-root-from-ubuntu-image.yaml
+TOBE DONE for every node!

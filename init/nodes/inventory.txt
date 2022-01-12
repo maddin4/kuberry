@@ -1,0 +1,26 @@
+[controller]
+control ansible_connection=local
+
+[raspooterhost]
+raspooter ansible_user=kubeops
+
+[masters]
+raspi4-[7:9:1]
+
+[workers]
+raspi4-[2:6:1]
+
+[all_k8s_nodes]
+workers
+masters
+
+[all_k8s_nodes_dev]
+raspi4-9 hostname=raspi4-9 ip=192.168.178.219 serial=ca54fad6
+
+[raspooterhost:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[all_k8s_nodes_dev:vars]
+kuberryroot=/tmp/kuberry-root
+kuberrynfsmount=/tmp/kuberry-nfs-source
+kuberrynfs=/tmp/kuberry-nfs-source/image/nfsroot

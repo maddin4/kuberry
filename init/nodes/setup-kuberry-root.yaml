@@ -1,0 +1,100 @@
+- name: setup raspooter
+  hosts: all_k8s_nodes_dev
+  remote_user: kubeops
+
+  tasks:
+#    - name: make me current
+#      become: true
+#      apt:
+#        update_cache: yes
+#        upgrade: 'yes'
+
+    - name: install the required dependencies
+      become: true
+      apt:
+        name: 
+          - nfs-common
+        state: present
+        update_cache: yes
+
+    - name: Set hostname
+      become: true
+      copy:
+        dest: "/etc/hostname"
+        content: |
+          {{ hostname }}
+
+    - name: create directory kuberry-root
+      become: yes
+      file:
+        path: "{{ kuberryroot }}"
+        state: directory
+        mode: "u=rwx,g=rwx,o=rwx"
+
+    - name: mount kuberry-root
+      become: true
+      mount:
+        path: "{{ kuberryroot }}"
+        src: LABEL=KUBERRY-ROOT
+        fstype: ext4
+        state: present
+
+    - name: create directory kuberry-nfs-source
+      become: yes
+      file:
+        path: "{{ kuberrynfsmount }}"
+        state: directory
+        mode: "u=rwx,g=rwx,o=rwx"
+
+    - name: mount kuberry-nfs-source
+      become: yes
+      mount:
+        src: 192.168.178.200:/kuberry/
+        path: "{{ kuberrynfsmount }}"
+        opts: rw,sync,hard,intr
+        state: mounted
+        fstype: nfs
+
+    - name: copy ubuntu root from nfs to local KUBERRY-ROOT
+      become: true      
+      shell: rsync -xa {{ kuberrynfs }}/ {{ kuberryroot }}
+
+    - name: change fstab in ops root
+      become: true
+      copy:
+        dest: "{{ kuberryroot }}/etc/fstab"
+        content: |
+          192.168.178.200:/tftpboot/{{ serial }} /boot nfs defaults,vers=3,proto=tcp 0 0
+          LABEL=OPS-ROOT / ext4 defaults 0 0
+
+    - name: configure network
+      become: true
+      copy:
+        dest: "{{ kuberryroot }}/etc/cloud/cloud.cfg.d/10_rasperry.cfg"
+        content: |
+          ethernets:
+            eth0:
+              addresses:
+                - {{ ip }}/24
+              gateway4: 192.168.178.1
+              nameservers:
+                addresses: [192.168.178.1]
+              optional: true
+
+    - name: copy new cloud.cfg
+      become: true
+      copy:
+        src: ~/dev/kuberry2/init/fromImage/cloud.cfg
+        dest: "{{ kuberryroot }}/etc/cloud/cloud.cfg"
+        owner: kubeops
+        group: kubeops        
+        mode: 777
+      register: COPY_RESULT
+
+
+    - name: umount kuberryroot
+      become: true
+      shell: umount {{ kuberryroot }}
+      args:
+        executable: /bin/bash
+

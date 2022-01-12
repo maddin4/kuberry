@@ -1,0 +1,150 @@
+
+- name: prepare image to be present
+  hosts: raspooterhost
+  remote_user: kubeops
+
+  tasks:
+    - name: Include vars of raspis.yaml
+      include_vars:
+        file: raspis.yaml
+
+    - name: Check if the ubuntu_image exists
+      stat:
+        path: /kuberry/{{ ubuntu_image }}
+        get_checksum: no
+        get_md5: no
+        get_mime: no
+        get_attributes: no      
+      register: IMAGE_EXISTS
+
+    - name: create directory /kuberry
+      become: true
+      ansible.builtin.file:
+        path: /kuberry
+        state: directory
+        mode: '0755'
+        group: kubeops
+        owner: kubeops
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: Image does NOT exist
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: Image DOES exist
+      when: IMAGE_EXISTS.stat.exists
+
+    - name: download image of ubuntu
+      get_url:
+        url: http://{{ image_source_url }}/{{ ubuntu_image }}.xz
+        dest: /kuberry/{{ ubuntu_image }}.xz
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: unzip image of ubuntu
+      shell: xz -k --decompress {{ ubuntu_image }}.xz
+      args:
+        chdir: /kuberry
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: find start_boot of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '1p'
+      register: START_BOOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find boot size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '9p'
+      register: BOOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+        
+    - name: create directory ubuntubootimage
+      ansible.builtin.file:
+        path: "{{ ubuntubootimage }}"
+        state: directory
+        mode: '0755'
+
+    - name: check whether ubuntubootimage is mounted
+      shell:  if grep -q {{ ubuntubootimage }} /proc/mounts; then echo "yes"; else echo "no"; fi
+      become: true
+      args:
+        executable: /bin/bash
+      register: BOOT_MOUNTED
+
+    - name: umount ubuntubootimage
+      shell: umount {{ ubuntubootimage }}
+      become: true
+      args:
+        executable: /bin/bash
+      ignore_errors: True
+      when: BOOT_MOUNTED.stdout == 'yes'
+
+    - name: mount ubuntubootimage image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_BOOT.stdout }} )),sizelimit=$(( 1 *  {{ BOOT_SIZE_LIMIT.stdout }} )) {{ ubuntubootimage }}
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find root image of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '2p'
+      register: START_ROOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find root size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '10p'
+      register: ROOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: create directory ubunturootimage
+      ansible.builtin.file:
+        path: "{{ ubunturootimage }}"
+        state: directory
+        mode: '0755'
+
+    - name: check whether ubunturootimage is mounted
+      shell:  if grep -q {{ ubunturootimage }} /proc/mounts; then echo "yes"; else echo "no"; fi
+      become: true
+      args:
+        executable: /bin/bash
+      register: ROOT_MOUNTED
+
+    - name: umount ubunturootimage
+      shell: umount {{ ubunturootimage }}
+      become: true
+      args:
+        executable: /bin/bash
+      when: ROOT_MOUNTED.stdout == 'yes'
+
+    - name: mount ubunturootimage image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_ROOT.stdout }} )),sizelimit=$(( 1 *  {{ ROOT_SIZE_LIMIT.stdout }} )) {{ ubunturootimage }}
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: create directory ubunturootnfs
+      ansible.builtin.file:
+        path: "{{ ubunturootnfs }}"
+        state: directory
+        mode: '0755'
+
+    - name: copy ubuntu root from image to nfs
+      become: true      
+      shell: rsync -xa --progress --exclude {{ ubunturootimage }}/nfs {{ ubunturootimage }}/ {{ ubunturootnfs }}
+
+    - name: copy new cloud.cfg
+      become: true
+      copy:
+        src: /Users/martin/dev/kuberry2/fromImage/cloud.cfg
+        dest: "{{ ubunturootnfs }}/etc/cloud/cloud.cfg"
+        mode: 0755
+      register: COPY_RESULT

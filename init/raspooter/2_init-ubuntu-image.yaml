@@ -1,0 +1,148 @@
+
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: kubeops
+  vars:
+#    image_source_url: old-releases.ubuntu.com/releases/focal
+#    ubuntu_image: ubuntu-20.04.1-preinstalled-server-arm64+raspi.img
+#    ubuntu_image: ubuntu-20.04.2-preinstalled-server-arm64+raspi.img
+    image_source_url: ftp.uni-kl.de/pub/linux/ubuntu-dvd/ubuntu/releases/20.04/release
+    ubuntu_image: ubuntu-20.04.3-preinstalled-server-arm64+raspi.img
+#    ubuntu_image: ubuntu-21.10-preinstalled-server-arm64+raspi.img
+
+  tasks:
+    - name: Check if the ubuntu_image exists
+      stat:
+        path: /kuberry/{{ ubuntu_image }}
+        get_checksum: no
+        get_md5: no
+        get_mime: no
+        get_attributes: no      
+      register: IMAGE_EXISTS
+
+    - name: create directory /kuberry
+      become: true
+      ansible.builtin.file:
+        path: /kuberry
+        state: directory
+        mode: '0755'
+        group: kubeops
+        owner: kubeops
+
+#    - name: Print
+#      ansible.builtin.debug:
+#        msg: IMAGE_EXISTS is {{ IMAGE_EXISTS }}
+        
+    - name: Print
+      ansible.builtin.debug:
+        msg: Image does NOT exist
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: Image DOES exist
+      when: IMAGE_EXISTS.stat.exists
+
+    - name: download image of ubuntu
+      get_url:
+        url: http://{{ image_source_url }}/{{ ubuntu_image }}.xz
+        dest: /kuberry/{{ ubuntu_image }}.xz
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: unzip image of ubuntu
+      shell: xz -k --decompress {{ ubuntu_image }}.xz
+      args:
+        chdir: /kuberry
+      when: not IMAGE_EXISTS.stat.exists
+
+    - name: find boot image of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '1p'
+      register: START_BOOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find boot size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '9p'
+      register: BOOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: START_BOOT is {{ START_BOOT.stdout }} and LIMIT is {{ BOOT_SIZE_LIMIT.stdout }}
+
+    - name: find root image of ubuntu
+      shell: /usr/sbin/sfdisk -l {{ ubuntu_image }} -o Start | sed '0,/^ Start$/d' | sed -n '2p'
+      register: START_ROOT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: find boot size limit of image of ubuntu
+      shell: /usr/sbin/fdisk --bytes -lo Size {{ ubuntu_image }} | sed -n '10p'
+      register: ROOT_SIZE_LIMIT
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+    
+    - name: Print
+      ansible.builtin.debug:
+        msg: START_ROOT is {{ START_ROOT.stdout }} and LIMIt is {{ ROOT_SIZE_LIMIT.stdout }}
+
+    
+    - name: create directory boot_source
+      ansible.builtin.file:
+        path: /kuberry/boot_source
+        state: directory
+        mode: '0755'
+
+    - name: create directory root_source
+      ansible.builtin.file:
+        path: /kuberry/root_source
+        state: directory
+        mode: '0755'
+
+    - name: check whether boot_source is mounted
+      shell:  if grep -q boot_source /proc/mounts; then echo "yes"; else echo "no"; fi
+      become: true
+      args:
+        executable: /bin/bash
+      register: BOOT_MOUNTED
+
+    - name: check whether root_source is mounted
+      shell:  if grep -q root_source /proc/mounts; then echo "yes"; else echo "no"; fi
+      become: true
+      args:
+        executable: /bin/bash
+      register: ROOT_MOUNTED
+
+    - name: umount root_source
+      shell: umount /kuberry/root_source/
+      become: true
+      args:
+        executable: /bin/bash
+      when: ROOT_MOUNTED.stdout == 'yes'
+
+    - name: umount boot_source
+      shell: umount /kuberry/boot_source/
+      become: true
+      args:
+        executable: /bin/bash
+      ignore_errors: True
+      when: BOOT_MOUNTED.stdout == 'yes'
+
+    - name: mount boot_source image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_BOOT.stdout }} )),sizelimit=$(( 1 *  {{ BOOT_SIZE_LIMIT.stdout }} )) /kuberry/boot_source/
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry
+
+    - name: mount root_source image of ubuntu
+      shell: mount {{ ubuntu_image }} -o loop,offset=$(( 512 * {{ START_ROOT.stdout }} )),sizelimit=$(( 1 *  {{ ROOT_SIZE_LIMIT.stdout }} )) /kuberry/root_source/
+      become: true
+      args:
+        executable: /bin/bash
+        chdir: /kuberry

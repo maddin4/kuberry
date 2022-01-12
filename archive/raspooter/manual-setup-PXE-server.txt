@@ -1,0 +1,80 @@
+holen des image:
+wget http://old-releases.ubuntu.com/releases/focal/ubuntu-20.04.1-preinstalled-server-arm64+raspi.img.xz
+#wget https://cdimage.ubuntu.com/releases/20.04.2/release/ubuntu-20.04.2-preinstalled-server-arm64+raspi.img.xz
+==============================
+entpacken:
+xz --decompress ubuntu-20.04.1-preinstalled-server-arm64+raspi.img.xz
+==============================
+bestimmen der mountbaren Abbilder:
+fdisk -l ubuntu-20.04.1-preinstalled-server-arm64+raspi.img
+--> Sektorengröße (hier: 512 Bytes)
+--> Start img1: 2048
+--> Start img2: 526336
+==============================
+mkdir -p /kuberry/boot_source
+mkdir -p /kuberry/root_source
+sudo mount ubuntu-20.04.1-preinstalled-server-arm64+raspi.img -o loop,offset=$(( 512 * 2048 ))  ,sizelimit=$(( 1 * 268435456 )) /kuberry/boot_source/
+sudo mount ubuntu-20.04.1-preinstalled-server-arm64+raspi.img -o loop,offset=$(( 512 * 526336 )),sizelimit=$(( 1 * 2981322752 )) /kuberry/root_source/
+==============================
+create primary partitions
+sudo fdisk /dev/sdb
+n
+p
++5G
+==============================
+create ext filesystem
+sudo mkfs.ext4 /dev/sdb1
+sudo mkfs.ext4 /dev/sdb2
+==============================
+mount the new partitions:
+rmdir -r tgt_root_1
+rmdir -r tgt_root_2
+mkdir tgt_root_1
+mkdir tgt_root_2
+sudo mount /dev/sdb1 tgt_root_1
+sudo mount /dev/sdb2 tgt_root_2
+==============================
+sync the image to mounted new boot:
+sudo rsync -qaHAXS root_source/ tgt_root_1 &
+sudo rsync -qaHAXS root_source/ tgt_root_2
+
+==============================
+setup partitions
+
+https://projects.ttlexceeded.com/rpi_backup_to_different_card_size.html
+
+==============================
+Partitionen labeln:
+sudo e2label /dev/sdb1 KUBERY_ROOT
+sudo e2label /dev/sdb2 OPS_ROOT
+==============================
+Partitionsprüfung mit:
+blkid
+==============================
+os-root korrekt setzen:
+edit tgt_root_1/etc/fstab:
+LABEL=ROOT1	        /	 ext4	defaults	0 0
+LABEL=ROOT2         /other_root ext4 defaults 0 0
+LABEL=system-boot   /boot/firmware  vfat    defaults        0       1
+
+edit tgt_root_2/etc/fstab:
+LABEL=ROOT2	        /	 ext4	defaults	0 0
+LABEL=ROOT1         /other_root ext4 defaults 0 0
+LABEL=system-boot   /boot/firmware  vfat    defaults        0       1
+==============================
+
+edit cmdline.txt:
+#SABRENT-USB-SATA Adapter:
+usb-storage.quirks=152d:1561:u dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=ROOT2 rootfstype=ext4 elevator=deadline rootwait fixrtc
+==============================
+edit usercfg.txt:
+[pi4]
+max_framebuffers=2
+dtoverlay=vc4-fkms-v3d
+boot_delay
+kernel=vmlinuz
+initramfs initrd.img followkernel
+==============================
+enable ssh:
+touch ssh
+==============================

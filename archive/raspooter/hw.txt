@@ -3,7 +3,7 @@ raspi4-1
     ip: 192.168.178.211
     mac: dc:a6:32:d6:d6:ac
 raspi4-2
-    serial: 267b735
+    serial: 0267b735
     ip: 192.168.178.212
     mac: dc:a6:32:d6:d8:9b
 raspi4-3

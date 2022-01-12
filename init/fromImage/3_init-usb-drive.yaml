@@ -1,0 +1,97 @@
+
+- name: setup usb stick
+  hosts: raspooterhost
+  remote_user: kubeops
+  tasks:
+    - name: Include vars of raspis.yaml
+      include_vars:
+        file: raspis.yaml
+
+    - name: get the last device and use it as current new USB-drive
+      shell:  lsblk -S | sed -n '3,3p' | sed 's/ .*//'
+      become: true
+      args:
+        executable: /bin/bash
+      register: TGT_DEVICE
+
+    - name: print the current device
+      debug:
+        msg: TGT_DEVICE is {{ TGT_DEVICE.stdout }}
+
+    - name: get the size of the device and divide by 3
+      shell:  lsblk -bd | grep {{ TGT_DEVICE.stdout }} | awk '{printf "%.f\n", ($4/3)/1024/1024/1024 - 1}'
+      become: true
+      args:
+        executable: /bin/bash
+      register: TGT_SIZE
+
+    - name: print the target device size
+      debug:
+        msg: TGT_SIZE is {{ TGT_SIZE.stdout }}
+
+    - name: Read device information (always use unit when probing)
+      become: true
+      community.general.parted: device=/dev/{{ TGT_DEVICE.stdout }}
+      register: TGT_DEVICE_INFO
+
+    - name: Remove all partitions from disk
+      become: true
+      shell: sfdisk --delete /dev/{{ TGT_DEVICE.stdout }}
+
+    - name: ensure deletion
+      become: true
+      shell: partprobe
+
+    - name: Create primary partition 1 with a size of TGT_SIZE
+      become: true
+      community.general.parted:
+        device: /dev/{{ TGT_DEVICE.stdout }}
+        number: 1
+        state: present
+        part_end: "{{ TGT_SIZE.stdout }}GiB"
+        unit: GiB
+
+    - name: Create primary partition 2 with a size of TGT_SIZE
+      become: true
+      community.general.parted:
+        device: /dev/{{ TGT_DEVICE.stdout }}
+        number: 2
+        state: present
+        part_start: "{{ TGT_SIZE.stdout }}GiB" 
+        part_end: "{{ (TGT_SIZE.stdout|int*2)|int }}GiB"
+        unit: GiB
+
+    - name: Create primary partition 3 with a size of TGT_SIZE
+      become: true
+      community.general.parted:
+        device: /dev/{{ TGT_DEVICE.stdout }}
+        number: 3
+        state: present
+        part_start: "{{ (TGT_SIZE.stdout|int*2)|int }}GiB" 
+        part_end: "{{ (TGT_SIZE.stdout|int*3)|int }}GiB"
+        unit: GiB
+
+    - name: Create a ext4 filesystem on /dev/sdb1 and check disk blocks
+      become: true
+      shell: mkfs.ext4 /dev/{{ TGT_DEVICE.stdout }}1
+
+    - name: Create a ext4 filesystem on /dev/sdb2 and check disk blocks
+      become: true
+      shell: mkfs.ext4 /dev/{{ TGT_DEVICE.stdout }}2
+
+    - name: Create a ext4 filesystem on /dev/sdb3 and check disk blocks
+      become: true
+      shell: mkfs.ext4 /dev/{{ TGT_DEVICE.stdout }}3
+
+    - name: label the first partition
+      become: true
+      shell: e2label /dev/{{ TGT_DEVICE.stdout }}1 OPS-ROOT
+
+    - name: label the second partition
+      become: true
+      shell: e2label /dev/{{ TGT_DEVICE.stdout }}2 KUBERRY-ROOT
+
+    - name: label the third partition
+      become: true
+      shell: e2label /dev/{{ TGT_DEVICE.stdout }}3 ALT-ROOT
+

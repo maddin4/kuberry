@@ -1,0 +1,17 @@
+#cloud-config
+
+# hey folks this is working - only the /bin/bash has to be executed after start!
+groups:
+  - kubeops
+
+users:
+  - name: kubeops
+    gecos: Kubeops
+    primary_group: kubeops
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC3W3vs4JXgVwekPIzeFFFikd5Lhhtjeaj2MCXFXwGBloVPSbNMm9cBoXcRCPUnJR3YAg3gbXgEqpLLQgYtF7mro0PWMS7Jm/WBNckJ5hL9EGxhInZy9ilTa4/PT1UMqS+nCbk86tuKzSMMEb8I5gnUg4p3fQuHRI58CIBEJdUaI0+jAWxkIpX2bV6G3Y+UJtBAs96tec8Ur6XbihdLmo9W9Wu+yfZvlP3O6AZZ4te4Z0B84VlxThr9sisgMrC93JLpThHkNHKlfSlqFOx+gYT/uArWSJIthzVI0Irpe2LUgiDHP3OWWC4K05zD+5o3RvhQ0xLk8oU8g1j2kDhVxrJoLIMT0GElKfZF9lout+UnjGR1hbHE1vNG4Yz0fe1lF9OinwQiwXVSfKjAkwSyqdlZstfexvbF5KtE3OfRt9OLW8DLGIq/F0+OrfC30FbyVpxSjNgJL0WnNqaFeIuk2r50I1xycuqs3B4jBnRnwdOkcMYp/g0gkhFY8gPO9ObOUsc= martin@MacMini2.fritz.box
+    groups: kubeops, users, admin
+    shell: /bin/bash
+    home: /home/kubeops
+

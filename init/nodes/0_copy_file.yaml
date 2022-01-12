@@ -1,0 +1,12 @@
+- name: setup file
+  hosts: all_k8s_nodes_dev
+  remote_user: kubeops  
+  tasks:
+    - name: copying file with playbook
+      become: true 
+      copy:
+        src: ~/dev/kuberry2/init/fromImage/cloud.cfg
+        dest: /tmp
+        owner: kubeops
+        group: kubeops        
+        mode: 777

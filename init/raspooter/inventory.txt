@@ -1,0 +1,10 @@
+[controller]
+control ansible_connection=local
+
+[raspooterhost]
+raspooter ansible_user=kubeops
+
+[raspooterhost:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[]

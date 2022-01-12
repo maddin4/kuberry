@@ -1,0 +1,111 @@
+
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: kubeops
+
+  tasks:
+    - name: make me current
+      become: true
+      apt:
+        update_cache: yes
+        upgrade: 'yes'
+ 
+    - name: Set hostname
+      become: true
+      copy:
+        dest: "/etc/hostname"
+        content: |
+          raspooter
+
+    - name: install python3
+      become: true
+      apt:
+        update_cache: yes
+        name: 
+          - python
+        state: present
+
+    - name: setup static IP-Adress for raspooter
+      become: true
+      copy:
+        dest: "/etc/systemd/network/11-eth0.network"
+        content: |
+          network:
+            ethernets:
+              eth0:
+                dhcp4: no
+                dhcp6: no
+                addresses: [192.168.178.200/24]
+                nameservers:
+                  addresses: [192.168.178.1,8.8.8.8,8.8.4.4]
+                routes:
+                  - to: 0.0.0.0/0
+                    via: 192.168.178.1
+                    metric: 50
+
+    - name: apply netplan
+      become: true
+      ansible.builtin.command: netplan apply
+
+    - name: install the required dependencies
+      become: true
+      apt:
+        name: 
+          - tcpdump
+          - dnsmasq
+          - nfs-kernel-server
+          - net-tools
+        state: present
+        update_cache: yes
+
+    - name: configure working DNS in resolved.conf
+      become: yes
+      replace: 
+        path: /etc/systemd/resolved.conf
+        regexp: '(^#DNS=\s)(.*)$'
+        replace: '\1DNS=192.168.178.1'
+        backup: yes
+
+    - name: create directory tftpboot
+      become: yes
+      file:
+        path: /tftpboot
+        state: directory
+        mode: "u=rwx,g=rwx,o=rwx"
+
+    - name: configure dnsmasq
+      become: true
+      copy:
+        dest: "/etc/dnsmasq.conf"
+        content: |
+          port=0
+          dhcp-range=192.168.178.255,proxy
+          log-dhcp
+          enable-tftp
+          tftp-root=/tftpboot
+          pxe-service=0,"Raspberry Pi Boot"
+          log-queries
+          log-facility=/var/log/dnsmasq.log
+    
+    - name: nfs share exports
+      become: true
+      copy:
+        dest: "/etc/exports"
+        content: |
+          /tftpboot *(rw,sync,no_subtree_check,no_root_squash)"
+    
+#    - name: Restarting Network
+#      become: yes 
+#      ansible.builtin.service:
+#        name: network
+#        state: restarted
+
+    - name: Restart service dnsmasq
+      become: yes
+      ansible.builtin.service:
+        name: dnsmasq
+        state: restarted
+
+    - name: Unconditionally reboot the machine
+      become: true
+      reboot:

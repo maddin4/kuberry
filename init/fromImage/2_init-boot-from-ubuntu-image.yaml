@@ -1,0 +1,46 @@
+- name: setup raspooter
+  hosts: raspooterhost
+  remote_user: kubeops
+
+  tasks:
+    - name: Include vars of raspis.yaml
+      include_vars:
+        file: raspis.yaml
+
+    - name: Print
+      debug: 
+        var: item.serial
+      loop: "{{ raspis }}"
+
+    - name: create boot directory
+      ansible.builtin.file:
+        path: /tftpboot/{{ item.serial }}
+        state: directory
+        mode: '0755'
+      become: true
+      loop: "{{ raspis }}"
+    
+    - name: copy ubuntubootimage directory
+      copy:
+        src: "{{ ubuntubootimage }}/"    # note the '/' <-- !!!
+        dest: /tftpboot/{{ item.serial }}/
+        remote_src: yes
+      become: true
+      loop: "{{ raspis }}"
+
+    - name: change cmdline.txt to boot correctly
+      become: true
+      copy:
+        dest: "/tftpboot/{{ item.serial }}/cmdline.txt"
+        content: |
+          dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=OPS-ROOT rootfstype=ext4 elevator=deadline rootwait fixrtc cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1
+      loop: "{{ raspis }}"
+          
+    - name: copy new cloud.cfg
+      become: true
+      copy:
+        src: /Users/martin/dev/kuberry2/fromImage/config.txt
+        dest: "/tftpboot/{{ item.serial }}/config.txt"
+        mode: 0755
+      register: COPY_RESULT
+      loop: "{{ raspis }}"

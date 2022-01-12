@@ -1,0 +1,160 @@
+
+- name: setup ubuntu nfs bootable 
+  hosts: raspooterhost
+  remote_user: kubeops
+  tasks:
+    - name: Include vars of raspis.yaml
+      include_vars:
+        file: raspis.yaml
+
+    - name: create directory tgtroot
+      ansible.builtin.file:
+        path: "{{ tgtroot }}"
+        state: directory
+        mode: '0755'
+
+    - name: check whether tgtroot is mounted
+      shell:  if grep -q {{ tgtroot }} /proc/mounts; then echo "yes"; else echo "no"; fi
+      become: true
+      args:
+        executable: /bin/bash
+      register: TGTROOT_MOUNTED
+
+    - name: umount tgtroot
+      shell: umount {{ tgtroot }}
+      become: true
+      args:
+        executable: /bin/bash
+      when: TGTROOT_MOUNTED.stdout == 'yes'
+
+    - name: mount tgtroot 
+      shell: mount LABEL=OPS-ROOT {{ tgtroot }}
+      become: true
+      args:
+        executable: /bin/bash
+
+    - name: copy ubuntu root from image to tgtroot
+      become: true      
+      shell: rsync -xa --progress --exclude {{ ubunturootimage }}/nfs {{ ubunturootimage }}/ {{ tgtroot }}
+
+    - name: change fstab in ops root
+      become: true
+      copy:
+        dest: "{{ tgtroot }}/etc/fstab"
+        content: |
+          192.168.178.200:/tftpboot/{{ item.serial }} /boot nfs defaults,vers=3,proto=tcp 0 0
+          LABEL=OPS-ROOT / ext4 defaults 0 0
+      loop: "{{ raspis }}"
+
+    - name: copy new cloud.cfg
+      become: true
+      copy:
+        src: /Users/martin/dev/kuberry2/fromImage/cloud.cfg
+        dest: "{{ tgtroot }}/etc/cloud/cloud.cfg"
+        mode: 0755
+      register: COPY_RESULT
+
+    - name: check cloud.cfg
+      become: true
+      shell: ls -ltr {{ tgtroot }}/etc/cloud/
+      register: LS_RESULT
+
+    - name: Print
+      ansible.builtin.debug:
+        msg: LS_RESULT is {{ LS_RESULT }}
+
+
+    - name: configure network
+      become: true
+      copy:
+        dest: "{{ tgtroot }}/etc/cloud/cloud.cfg.d/10_rasperry.cfg"
+        content: |
+          ethernets:
+            eth0:
+              addresses:
+                - {{ item.ip }}/24
+              gateway4: 192.168.178.1
+              nameservers:
+                addresses: [192.168.178.1]
+              optional: true
+      loop: "{{ raspis }}"
+
+#    - name: mount dev
+#      shell: mount --bind /dev dev
+#      become: true
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: mount sys
+#      shell: mount --bind /sys sys
+#      become: true
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: mount proc
+#      shell: mount --bind /proc proc
+#      become: true
+#      args:
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: delete old ssh keys
+#      become: true
+#      shell: rm -rf etc/ssh/ssh_host_*
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: generate new ssh keys
+#      become: true
+#      shell: chroot . /bin/bash -c "dpkg-reconfigure openssh-server"
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: create new group kupeops
+#      become: true
+#      shell: chroot . /bin/bash -c "groupadd kubeops"
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: create new user kupeops
+#      become: true
+#      shell: chroot . /bin/bash -c "useradd -s /bin/bash -g kubeops -G users,admin  -m kubeops"
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+#
+#    - name: create .ssh for kubeops
+#      become: true
+#      ansible.builtin.file:
+#        path: "{{ tgtroot }}/home/kubeops/.ssh"
+#        state: directory
+#        group: kubeops
+#        owner: kubeops
+#        mode: '0700'
+#
+#    - name: create authorized_keys for kubeops
+#      become: true
+#      copy:
+#        dest: "{{ tgtroot }}/home/kubeops/.ssh/authorized_keys"
+#        owner: kubeops
+#        group: kubeops
+#        mode: '0600'
+#        content: |
+#          ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC3W3vs4JXgVwekPIzeFFFikd5Lhhtjeaj2MCXFXwGBloVPSbNMm9cBoXcRCPUnJR3YAg3gbXgEqpLLQgYtF7mro0PWMS7Jm/WBNckJ5hL9EGxhInZy9ilTa4/PT1UMqS+nCbk86tuKzSMMEb8I5gnUg4p3fQuHRI58CIBEJdUaI0+jAWxkIpX2bV6G3Y+UJtBAs96tec8Ur6XbihdLmo9W9Wu+yfZvlP3O6AZZ4te4Z0B84VlxThr9sisgMrC93JLpThHkNHKlfSlqFOx+gYT/uArWSJIthzVI0Irpe2LUgiDHP3OWWC4K05zD+5o3RvhQ0xLk8oU8g1j2kDhVxrJoLIMT0GElKfZF9lout+UnjGR1hbHE1vNG4Yz0fe1lF9OinwQiwXVSfKjAkwSyqdlZstfexvbF5KtE3OfRt9OLW8DLGIq/F0+OrfC30FbyVpxSjNgJL0WnNqaFeIuk2r50I1xycuqs3B4jBnRnwdOkcMYp/g0gkhFY8gPO9ObOUsc= martin@MacMini2.fritz.box
+#
+#    - name: umount dev sys proc tgtroot
+#      become: true
+#      shell: umount dev sys proc
+#      args:
+#        executable: /bin/bash
+#        chdir: "{{ tgtroot }}"
+
+    - name: umount tgtroot
+      become: true
+      shell: umount {{ tgtroot }}
+      args:
+        executable: /bin/bash
